@@ -2,17 +2,17 @@
 // All processing happens client-side for zero server costs
 
 export interface EnhanceSettings {
-  exposure: number;    // -100 to 100
-  contrast: number;    // -100 to 100
-  saturation: number;  // -100 to 100
-  warmth: number;      // -100 to 100
+  exposure: number;
+  contrast: number;
+  saturation: number;
+  warmth: number;
 }
 
 export interface WatermarkSettings {
   enabled: boolean;
   position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
-  size: number;    // 5 to 50 (% of image width)
-  opacity: number; // 0 to 100
+  size: number;
+  opacity: number;
 }
 
 export const DEFAULT_ENHANCE: EnhanceSettings = {
@@ -52,6 +52,9 @@ export function applyEnhancements(
   height: number,
   settings: EnhanceSettings
 ) {
+  if (settings.exposure === 0 && settings.contrast === 0 && 
+      settings.saturation === 0 && settings.warmth === 0) return;
+
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
 
@@ -66,28 +69,28 @@ export function applyEnhancements(
     let b = data[i + 2];
 
     // Exposure
-    r = Math.min(255, r * exposureFactor);
-    g = Math.min(255, g * exposureFactor);
-    b = Math.min(255, b * exposureFactor);
+    r *= exposureFactor;
+    g *= exposureFactor;
+    b *= exposureFactor;
 
     // Contrast
-    r = Math.min(255, Math.max(0, contrastFactor * (r - 128) + 128));
-    g = Math.min(255, Math.max(0, contrastFactor * (g - 128) + 128));
-    b = Math.min(255, Math.max(0, contrastFactor * (b - 128) + 128));
+    r = contrastFactor * (r - 128) + 128;
+    g = contrastFactor * (g - 128) + 128;
+    b = contrastFactor * (b - 128) + 128;
 
-    // Saturation (luminance-based)
+    // Saturation
     const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    r = Math.min(255, Math.max(0, gray + satFactor * (r - gray)));
-    g = Math.min(255, Math.max(0, gray + satFactor * (g - gray)));
-    b = Math.min(255, Math.max(0, gray + satFactor * (b - gray)));
+    r = gray + satFactor * (r - gray);
+    g = gray + satFactor * (g - gray);
+    b = gray + satFactor * (b - gray);
 
-    // Warmth (shift red up, blue down)
-    r = Math.min(255, Math.max(0, r + warmthShift));
-    b = Math.min(255, Math.max(0, b - warmthShift));
+    // Warmth
+    r += warmthShift;
+    b -= warmthShift;
 
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
+    data[i] = Math.min(255, Math.max(0, r));
+    data[i + 1] = Math.min(255, Math.max(0, g));
+    data[i + 2] = Math.min(255, Math.max(0, b));
   }
 
   ctx.putImageData(imageData, 0, 0);
@@ -123,6 +126,8 @@ export function drawWatermark(
 
   ctx.save();
   ctx.globalAlpha = settings.opacity / 100;
+  // Use 'screen' blend mode so black background becomes transparent
+  ctx.globalCompositeOperation = 'screen';
   ctx.drawImage(logoImg, x, y, logoWidth, logoHeight);
   ctx.restore();
 }
