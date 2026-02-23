@@ -23,10 +23,10 @@ export const DEFAULT_ENHANCE: EnhanceSettings = {
 };
 
 export const REAL_ESTATE_MAGIC: EnhanceSettings = {
-  exposure: 12,
-  contrast: 15,
-  saturation: 20,
-  warmth: 5,
+  exposure: 8,
+  contrast: 6,
+  saturation: 10,
+  warmth: 12,
 };
 
 export const DEFAULT_WATERMARK: WatermarkSettings = {
