@@ -166,10 +166,10 @@ const Index: React.FC = () => {
       <div className="bg-orb bg-orb-3" />
 
       {/* Header */}
-      <header className="glass-panel-sm sticky top-0 z-50 px-4 py-2.5 mx-2 mt-2 flex items-center justify-between">
-        <LogoFilgueira />
+      <header className="glass-panel-sm sticky top-0 z-50 px-4 py-2.5 mx-2 mt-2 flex items-center justify-center relative">
+        <LogoFilgueira size="sm" />
         {images.length > 0 && (
-          <span className="text-[11px] text-muted-foreground bg-secondary/80 px-2.5 py-1 rounded-lg tabular-nums font-medium">
+          <span className="absolute right-3 text-[11px] text-muted-foreground bg-secondary/80 px-2.5 py-1 rounded-lg tabular-nums font-medium">
             {images.length}/15
           </span>
         )}
