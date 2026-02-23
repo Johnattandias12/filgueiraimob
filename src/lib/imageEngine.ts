@@ -1,5 +1,4 @@
 // Canvas-based image processing engine for real estate photos
-// All processing happens client-side for zero server costs
 
 export interface EnhanceSettings {
   exposure: number;
@@ -52,7 +51,7 @@ export function applyEnhancements(
   height: number,
   settings: EnhanceSettings
 ) {
-  if (settings.exposure === 0 && settings.contrast === 0 && 
+  if (settings.exposure === 0 && settings.contrast === 0 &&
       settings.saturation === 0 && settings.warmth === 0) return;
 
   const imageData = ctx.getImageData(0, 0, width, height);
@@ -68,23 +67,19 @@ export function applyEnhancements(
     let g = data[i + 1];
     let b = data[i + 2];
 
-    // Exposure
     r *= exposureFactor;
     g *= exposureFactor;
     b *= exposureFactor;
 
-    // Contrast
     r = contrastFactor * (r - 128) + 128;
     g = contrastFactor * (g - 128) + 128;
     b = contrastFactor * (b - 128) + 128;
 
-    // Saturation
     const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     r = gray + satFactor * (r - gray);
     g = gray + satFactor * (g - gray);
     b = gray + satFactor * (b - gray);
 
-    // Warmth
     r += warmthShift;
     b -= warmthShift;
 
@@ -96,39 +91,53 @@ export function applyEnhancements(
   ctx.putImageData(imageData, 0, 0);
 }
 
-export function drawWatermark(
+export function drawTextWatermark(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
-  logoImg: HTMLImageElement,
   settings: WatermarkSettings
 ) {
   if (!settings.enabled) return;
 
-  const logoWidth = (canvasWidth * settings.size) / 100;
-  const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-  const padding = canvasWidth * 0.03;
+  // Scale font sizes relative to image width
+  const scale = (canvasWidth * settings.size) / 100;
+  const mainFontSize = scale * 0.55;
+  const subFontSize = scale * 0.18;
 
-  let x: number, y: number;
+  const padding = canvasWidth * 0.03;
+  const totalHeight = mainFontSize + subFontSize + scale * 0.05;
+
+  // Calculate position
+  let cx: number, cy: number;
 
   switch (settings.position) {
     case 'top-left':
-      x = padding; y = padding; break;
+      cx = padding + scale * 0.5; cy = padding + totalHeight * 0.4; break;
     case 'top-right':
-      x = canvasWidth - logoWidth - padding; y = padding; break;
+      cx = canvasWidth - padding - scale * 0.5; cy = padding + totalHeight * 0.4; break;
     case 'bottom-left':
-      x = padding; y = canvasHeight - logoHeight - padding; break;
+      cx = padding + scale * 0.5; cy = canvasHeight - padding - totalHeight * 0.5; break;
     case 'bottom-right':
-      x = canvasWidth - logoWidth - padding; y = canvasHeight - logoHeight - padding; break;
+      cx = canvasWidth - padding - scale * 0.5; cy = canvasHeight - padding - totalHeight * 0.5; break;
     case 'center':
-      x = (canvasWidth - logoWidth) / 2; y = (canvasHeight - logoHeight) / 2; break;
+      cx = canvasWidth / 2; cy = canvasHeight / 2; break;
   }
 
   ctx.save();
   ctx.globalAlpha = settings.opacity / 100;
-  // Use 'screen' blend mode so black background becomes transparent
-  ctx.globalCompositeOperation = 'screen';
-  ctx.drawImage(logoImg, x, y, logoWidth, logoHeight);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // "Filgueira" — bold sans-serif
+  ctx.font = `900 ${mainFontSize}px -apple-system, BlinkMacSystemFont, "Inter", "Roboto", "Helvetica Neue", sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('Filgueira', cx, cy - subFontSize * 0.6);
+
+  // "Imobiliária" — serif below
+  ctx.font = `700 ${subFontSize}px Georgia, "Times New Roman", serif`;
+  ctx.letterSpacing = `${subFontSize * 0.04}px`;
+  ctx.fillText('Imobiliária', cx, cy + mainFontSize * 0.45);
+
   ctx.restore();
 }
 
@@ -136,7 +145,6 @@ export async function processImage(
   originalSrc: string,
   enhance: EnhanceSettings,
   watermark: WatermarkSettings,
-  logoSrc: string | null
 ): Promise<string> {
   const img = await loadImage(originalSrc);
   const canvas = document.createElement('canvas');
@@ -146,15 +154,7 @@ export async function processImage(
 
   ctx.drawImage(img, 0, 0);
   applyEnhancements(ctx, img.width, img.height, enhance);
-
-  if (watermark.enabled && logoSrc) {
-    try {
-      const logoImg = await loadImage(logoSrc);
-      drawWatermark(ctx, img.width, img.height, logoImg, watermark);
-    } catch (e) {
-      console.warn('Failed to load watermark logo:', e);
-    }
-  }
+  drawTextWatermark(ctx, img.width, img.height, watermark);
 
   return canvas.toDataURL('image/jpeg', 0.92);
 }

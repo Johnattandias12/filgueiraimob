@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   Wand2, Download, Share2, RotateCcw, ChevronDown, ChevronUp,
   Layers, ImageIcon, Loader2, Check, Sparkles, Plus
@@ -9,12 +9,12 @@ import ThumbnailStrip from '@/components/ThumbnailStrip';
 import BeforeAfterSlider from '@/components/BeforeAfterSlider';
 import EnhanceControls from '@/components/EnhanceControls';
 import WatermarkControls from '@/components/WatermarkControls';
+import LogoFilgueira from '@/components/LogoFilgueira';
 import {
   EnhanceSettings, WatermarkSettings,
   DEFAULT_ENHANCE, REAL_ESTATE_MAGIC, DEFAULT_WATERMARK,
   processImage, dataURLtoBlob,
 } from '@/lib/imageEngine';
-import defaultLogoUrl from '@/assets/filgueira-logo.png';
 
 interface ImageItem {
   id: string;
@@ -29,18 +29,10 @@ const Index: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [enhance, setEnhance] = useState<EnhanceSettings>(DEFAULT_ENHANCE);
   const [watermark, setWatermark] = useState<WatermarkSettings>(DEFAULT_WATERMARK);
-  const [logoSrc, setLogoSrc] = useState<string>(defaultLogoUrl);
   const [showControls, setShowControls] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [batchProgress, setBatchProgress] = useState<number | null>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
   const addPhotosInputRef = useRef<HTMLInputElement>(null);
-
-  // Load saved custom logo from localStorage
-  useEffect(() => {
-    const savedLogo = localStorage.getItem('filgueira-logo');
-    if (savedLogo) setLogoSrc(savedLogo);
-  }, []);
 
   const selected = images.find(i => i.id === selectedId) || null;
 
@@ -52,10 +44,7 @@ const Index: React.FC = () => {
       processedSrc: null,
       name: file.name,
     }));
-    setImages(prev => {
-      const combined = [...prev, ...newImages].slice(0, 15);
-      return combined;
-    });
+    setImages(prev => [...prev, ...newImages].slice(0, 15));
     setSelectedId(prev => prev || newImages[0]?.id || null);
     setShowControls(true);
   }, []);
@@ -78,7 +67,7 @@ const Index: React.FC = () => {
     if (!selected) return;
     setProcessing(true);
     try {
-      const result = await processImage(selected.originalSrc, enhance, watermark, logoSrc);
+      const result = await processImage(selected.originalSrc, enhance, watermark);
       setImages(prev => prev.map(i =>
         i.id === selected.id ? { ...i, processedSrc: result } : i
       ));
@@ -86,15 +75,14 @@ const Index: React.FC = () => {
       console.error('Processing failed:', e);
     }
     setProcessing(false);
-  }, [selected, enhance, watermark, logoSrc]);
+  }, [selected, enhance, watermark]);
 
   const handleMagic = useCallback(async () => {
     setEnhance(REAL_ESTATE_MAGIC);
-    // Auto-apply to current image
     if (!selected) return;
     setProcessing(true);
     try {
-      const result = await processImage(selected.originalSrc, REAL_ESTATE_MAGIC, watermark, logoSrc);
+      const result = await processImage(selected.originalSrc, REAL_ESTATE_MAGIC, watermark);
       setImages(prev => prev.map(i =>
         i.id === selected.id ? { ...i, processedSrc: result } : i
       ));
@@ -102,7 +90,7 @@ const Index: React.FC = () => {
       console.error('Processing failed:', e);
     }
     setProcessing(false);
-  }, [selected, watermark, logoSrc]);
+  }, [selected, watermark]);
 
   const handleReset = useCallback(() => {
     setEnhance(DEFAULT_ENHANCE);
@@ -119,7 +107,7 @@ const Index: React.FC = () => {
     try {
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
-        const result = await processImage(img.originalSrc, enhance, watermark, logoSrc);
+        const result = await processImage(img.originalSrc, enhance, watermark);
         setImages(prev => prev.map(item =>
           item.id === img.id ? { ...item, processedSrc: result } : item
         ));
@@ -130,7 +118,7 @@ const Index: React.FC = () => {
     }
     setProcessing(false);
     setBatchProgress(null);
-  }, [images, enhance, watermark, logoSrc]);
+  }, [images, enhance, watermark]);
 
   const handleDownload = useCallback((item: ImageItem) => {
     const src = item.processedSrc || item.originalSrc;
@@ -163,68 +151,30 @@ const Index: React.FC = () => {
     }
   }, []);
 
-  const handleLogoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setLogoSrc(dataUrl);
-      try {
-        localStorage.setItem('filgueira-logo', dataUrl);
-      } catch {
-        console.warn('Logo too large for localStorage');
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  }, []);
-
   const processedCount = images.filter(i => i.processedSrc).length;
   const canShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col safe-area-inset">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       {/* Header */}
       <header className="glass-panel-sm sticky top-0 z-50 px-4 py-3 mx-2 mt-2 flex items-center justify-between">
-        <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">Filgueira</h1>
-          <p className="text-[11px] text-muted-foreground">Editor Imobiliário</p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={() => logoInputRef.current?.click()}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-xl hover:bg-secondary active:scale-95"
-          >
-            Logo
-          </button>
-          <input
-            ref={logoInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleLogoUpload}
-          />
-          {images.length > 0 && (
-            <span className="text-[11px] text-muted-foreground bg-secondary px-2 py-1 rounded-lg tabular-nums">
-              {images.length}/15
-            </span>
-          )}
-        </div>
+        <LogoFilgueira />
+        {images.length > 0 && (
+          <span className="text-[11px] text-muted-foreground bg-secondary px-2 py-1 rounded-lg tabular-nums">
+            {images.length}/15
+          </span>
+        )}
       </header>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col p-2 gap-2 max-w-2xl mx-auto w-full pb-4">
         {images.length === 0 ? (
-          /* Empty Upload State */
           <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 animate-fade-in">
             <div className="text-center mb-2">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <Sparkles size={28} className="text-primary" />
               </div>
-              <h2 className="text-xl font-semibold text-foreground mb-1.5">
-                Editor de Fotos
-              </h2>
+              <h2 className="text-xl font-semibold text-foreground mb-1.5">Editor de Fotos</h2>
               <p className="text-muted-foreground text-sm max-w-[260px] mx-auto leading-relaxed">
                 Aprimore suas fotos imobiliárias e adicione marca d'água em segundos
               </p>
@@ -234,9 +184,8 @@ const Index: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* Editor State */
           <div className="flex flex-col gap-2 animate-fade-in">
-            {/* Thumbnails + Add Button */}
+            {/* Thumbnails + Add */}
             <div className="surface-card p-2">
               <div className="flex items-center gap-2">
                 <div className="flex-1 overflow-hidden">
@@ -255,8 +204,8 @@ const Index: React.FC = () => {
                 {images.length < 15 && (
                   <button
                     onClick={() => addPhotosInputRef.current?.click()}
-                    className="flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-dashed border-border 
-                      flex items-center justify-center text-muted-foreground hover:text-foreground 
+                    className="flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-dashed border-border
+                      flex items-center justify-center text-muted-foreground hover:text-foreground
                       hover:border-muted-foreground transition-all active:scale-95"
                   >
                     <Plus size={20} />
@@ -282,18 +231,10 @@ const Index: React.FC = () => {
             {selected && (
               <div className="surface-card p-2">
                 {selected.processedSrc ? (
-                  <BeforeAfterSlider
-                    beforeSrc={selected.originalSrc}
-                    afterSrc={selected.processedSrc}
-                  />
+                  <BeforeAfterSlider beforeSrc={selected.originalSrc} afterSrc={selected.processedSrc} />
                 ) : (
                   <div className="relative rounded-2xl overflow-hidden bg-card aspect-[4/3]">
-                    <img
-                      src={selected.originalSrc}
-                      alt={selected.name}
-                      className="w-full h-full object-contain"
-                      draggable={false}
-                    />
+                    <img src={selected.originalSrc} alt={selected.name} className="w-full h-full object-contain" draggable={false} />
                   </div>
                 )}
               </div>
@@ -318,7 +259,7 @@ const Index: React.FC = () => {
               </Button>
             </div>
 
-            {/* Controls Panel (collapsible) */}
+            {/* Controls */}
             <div className="surface-card">
               <button
                 onClick={() => setShowControls(!showControls)}
@@ -329,7 +270,6 @@ const Index: React.FC = () => {
                 </span>
                 {showControls ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
               </button>
-
               {showControls && (
                 <div className="px-4 pb-4 space-y-5 animate-fade-in">
                   <EnhanceControls settings={enhance} onChange={setEnhance} />
@@ -339,17 +279,14 @@ const Index: React.FC = () => {
               )}
             </div>
 
-            {/* Batch progress */}
+            {/* Progress */}
             {batchProgress !== null && (
               <div className="surface-card p-3">
                 <div className="flex items-center gap-3">
                   <Loader2 size={16} className="text-primary animate-spin flex-shrink-0" />
                   <div className="flex-1">
                     <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all duration-300"
-                        style={{ width: `${batchProgress}%` }}
-                      />
+                      <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${batchProgress}%` }} />
                     </div>
                   </div>
                   <span className="text-xs text-muted-foreground tabular-nums">{batchProgress}%</span>
@@ -357,7 +294,7 @@ const Index: React.FC = () => {
               </div>
             )}
 
-            {/* Apply Buttons */}
+            {/* Apply */}
             <div className="grid grid-cols-2 gap-2">
               <Button
                 onClick={handleProcessCurrent}
@@ -372,8 +309,7 @@ const Index: React.FC = () => {
                 className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.98] transition-transform"
                 disabled={processing || images.length === 0}
               >
-                <Layers size={18} />
-                Todas ({images.length})
+                <Layers size={18} /> Todas ({images.length})
               </Button>
             </div>
 
@@ -400,7 +336,6 @@ const Index: React.FC = () => {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="py-3 text-center flex-shrink-0">
         <p className="text-[11px] text-muted-foreground">Filgueira Imobiliária © {new Date().getFullYear()}</p>
       </footer>
