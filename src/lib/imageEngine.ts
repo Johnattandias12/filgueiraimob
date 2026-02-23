@@ -23,7 +23,7 @@ export const DEFAULT_ENHANCE: EnhanceSettings = {
 
 export const REAL_ESTATE_MAGIC: EnhanceSettings = {
   exposure: 8,
-  contrast: 6,
+  contrast: -3,
   saturation: 10,
   warmth: 12,
 };
@@ -31,8 +31,8 @@ export const REAL_ESTATE_MAGIC: EnhanceSettings = {
 export const DEFAULT_WATERMARK: WatermarkSettings = {
   enabled: true,
   position: 'bottom-right',
-  size: 20,
-  opacity: 70,
+  size: 16,
+  opacity: 30,
 };
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
