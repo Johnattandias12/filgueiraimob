@@ -30,7 +30,7 @@ export const REAL_ESTATE_MAGIC: EnhanceSettings = {
 
 export const DEFAULT_WATERMARK: WatermarkSettings = {
   enabled: true,
-  position: 'bottom-right',
+  position: 'center',
   size: 16,
   opacity: 30,
 };
