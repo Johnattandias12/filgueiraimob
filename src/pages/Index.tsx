@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  Wand2, Download, Share2, Upload, RotateCcw, ChevronDown, ChevronUp,
-  Layers, ImageIcon, Loader2, Check, Sparkles
+  Wand2, Download, Share2, RotateCcw, ChevronDown, ChevronUp,
+  Layers, ImageIcon, Loader2, Check, Sparkles, Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UploadZone from '@/components/UploadZone';
@@ -12,7 +12,7 @@ import WatermarkControls from '@/components/WatermarkControls';
 import {
   EnhanceSettings, WatermarkSettings,
   DEFAULT_ENHANCE, REAL_ESTATE_MAGIC, DEFAULT_WATERMARK,
-  processImage, dataURLtoBlob, loadImage
+  processImage, dataURLtoBlob,
 } from '@/lib/imageEngine';
 import defaultLogoUrl from '@/assets/filgueira-logo.png';
 
@@ -29,31 +29,17 @@ const Index: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [enhance, setEnhance] = useState<EnhanceSettings>(DEFAULT_ENHANCE);
   const [watermark, setWatermark] = useState<WatermarkSettings>(DEFAULT_WATERMARK);
-  const [logoSrc, setLogoSrc] = useState<string | null>(null);
+  const [logoSrc, setLogoSrc] = useState<string>(defaultLogoUrl);
   const [showControls, setShowControls] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [batchProgress, setBatchProgress] = useState<number | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const addPhotosInputRef = useRef<HTMLInputElement>(null);
 
-  // Load default or saved logo
+  // Load saved custom logo from localStorage
   useEffect(() => {
     const savedLogo = localStorage.getItem('filgueira-logo');
-    if (savedLogo) {
-      setLogoSrc(savedLogo);
-    } else {
-      // Convert the bundled logo to data URL and save
-      const canvas = document.createElement('canvas');
-      const img = new Image();
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        canvas.getContext('2d')!.drawImage(img, 0, 0);
-        const dataUrl = canvas.toDataURL('image/png');
-        setLogoSrc(dataUrl);
-        localStorage.setItem('filgueira-logo', dataUrl);
-      };
-      img.src = defaultLogoUrl;
-    }
+    if (savedLogo) setLogoSrc(savedLogo);
   }, []);
 
   const selected = images.find(i => i.id === selectedId) || null;
@@ -68,21 +54,25 @@ const Index: React.FC = () => {
     }));
     setImages(prev => {
       const combined = [...prev, ...newImages].slice(0, 15);
-      if (!selectedId || !prev.find(i => i.id === selectedId)) {
-        setSelectedId(combined[0]?.id || null);
-      }
       return combined;
     });
+    setSelectedId(prev => prev || newImages[0]?.id || null);
     setShowControls(true);
-  }, [selectedId]);
+  }, []);
 
   const handleRemove = useCallback((id: string) => {
     setImages(prev => {
       const next = prev.filter(i => i.id !== id);
-      if (selectedId === id) setSelectedId(next[0]?.id || null);
       return next;
     });
-  }, [selectedId]);
+    setSelectedId(prev => {
+      if (prev === id) {
+        const remaining = images.filter(i => i.id !== id);
+        return remaining[0]?.id || null;
+      }
+      return prev;
+    });
+  }, [images]);
 
   const handleProcessCurrent = useCallback(async () => {
     if (!selected) return;
@@ -98,13 +88,30 @@ const Index: React.FC = () => {
     setProcessing(false);
   }, [selected, enhance, watermark, logoSrc]);
 
-  const handleMagic = useCallback(() => {
+  const handleMagic = useCallback(async () => {
     setEnhance(REAL_ESTATE_MAGIC);
-  }, []);
+    // Auto-apply to current image
+    if (!selected) return;
+    setProcessing(true);
+    try {
+      const result = await processImage(selected.originalSrc, REAL_ESTATE_MAGIC, watermark, logoSrc);
+      setImages(prev => prev.map(i =>
+        i.id === selected.id ? { ...i, processedSrc: result } : i
+      ));
+    } catch (e) {
+      console.error('Processing failed:', e);
+    }
+    setProcessing(false);
+  }, [selected, watermark, logoSrc]);
 
   const handleReset = useCallback(() => {
     setEnhance(DEFAULT_ENHANCE);
-  }, []);
+    if (selected) {
+      setImages(prev => prev.map(i =>
+        i.id === selected.id ? { ...i, processedSrc: null } : i
+      ));
+    }
+  }, [selected]);
 
   const handleBatchProcess = useCallback(async () => {
     setProcessing(true);
@@ -130,21 +137,25 @@ const Index: React.FC = () => {
     const a = document.createElement('a');
     a.href = src;
     a.download = `filgueira_${item.name}`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   }, []);
 
   const handleDownloadAll = useCallback(() => {
-    images.forEach(img => {
-      if (img.processedSrc) handleDownload(img);
+    const processed = images.filter(i => i.processedSrc);
+    processed.forEach((img, index) => {
+      setTimeout(() => handleDownload(img), index * 200);
     });
   }, [images, handleDownload]);
 
   const handleShare = useCallback(async (item: ImageItem) => {
-    const src = item.processedSrc || item.originalSrc;
+    const src = item.processedSrc;
+    if (!src) return;
     try {
       const blob = dataURLtoBlob(src);
       const file = new File([blob], `filgueira_${item.name}`, { type: 'image/jpeg' });
-      if (navigator.share) {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: 'Filgueira Imobiliária' });
       }
     } catch (e) {
@@ -159,25 +170,31 @@ const Index: React.FC = () => {
     reader.onload = () => {
       const dataUrl = reader.result as string;
       setLogoSrc(dataUrl);
-      localStorage.setItem('filgueira-logo', dataUrl);
+      try {
+        localStorage.setItem('filgueira-logo', dataUrl);
+      } catch {
+        console.warn('Logo too large for localStorage');
+      }
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   }, []);
 
   const processedCount = images.filter(i => i.processedSrc).length;
+  const canShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col safe-area-inset">
       {/* Header */}
       <header className="glass-panel-sm sticky top-0 z-50 px-4 py-3 mx-2 mt-2 flex items-center justify-between">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-lg font-semibold text-foreground tracking-tight">Filgueira</h1>
-          <p className="text-xs text-muted-foreground">Editor Imobiliário</p>
+          <p className="text-[11px] text-muted-foreground">Editor Imobiliário</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => logoInputRef.current?.click()}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-secondary"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-xl hover:bg-secondary active:scale-95"
           >
             Logo
           </button>
@@ -189,58 +206,81 @@ const Index: React.FC = () => {
             onChange={handleLogoUpload}
           />
           {images.length > 0 && (
-            <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-lg">
-              {images.length} foto{images.length !== 1 ? 's' : ''}
+            <span className="text-[11px] text-muted-foreground bg-secondary px-2 py-1 rounded-lg tabular-nums">
+              {images.length}/15
             </span>
           )}
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col p-2 gap-2 max-w-4xl mx-auto w-full">
+      <main className="flex-1 flex flex-col p-2 gap-2 max-w-2xl mx-auto w-full pb-4">
         {images.length === 0 ? (
-          /* Upload State */
+          /* Empty Upload State */
           <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 animate-fade-in">
-            <div className="text-center mb-4">
-              <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <Sparkles size={36} className="text-primary" />
+            <div className="text-center mb-2">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <Sparkles size={28} className="text-primary" />
               </div>
-              <h2 className="text-2xl font-semibold text-foreground mb-2">
+              <h2 className="text-xl font-semibold text-foreground mb-1.5">
                 Editor de Fotos
               </h2>
-              <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+              <p className="text-muted-foreground text-sm max-w-[260px] mx-auto leading-relaxed">
                 Aprimore suas fotos imobiliárias e adicione marca d'água em segundos
               </p>
             </div>
-            <div className="w-full max-w-md">
+            <div className="w-full max-w-sm">
               <UploadZone onFilesSelected={handleFilesSelected} />
             </div>
           </div>
         ) : (
           /* Editor State */
           <div className="flex flex-col gap-2 animate-fade-in">
-            {/* Thumbnail Strip */}
+            {/* Thumbnails + Add Button */}
             <div className="surface-card p-2">
-              <ThumbnailStrip
-                images={images.map(i => ({
-                  id: i.id,
-                  src: i.processedSrc || i.originalSrc,
-                  name: i.name,
-                  processed: !!i.processedSrc,
-                }))}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                onRemove={handleRemove}
-              />
-              {/* Add more photos */}
-              <div className="mt-2 flex items-center gap-2">
-                <UploadZone onFilesSelected={handleFilesSelected} maxFiles={15 - images.length} />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 overflow-hidden">
+                  <ThumbnailStrip
+                    images={images.map(i => ({
+                      id: i.id,
+                      src: i.processedSrc || i.originalSrc,
+                      name: i.name,
+                      processed: !!i.processedSrc,
+                    }))}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                    onRemove={handleRemove}
+                  />
+                </div>
+                {images.length < 15 && (
+                  <button
+                    onClick={() => addPhotosInputRef.current?.click()}
+                    className="flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-dashed border-border 
+                      flex items-center justify-center text-muted-foreground hover:text-foreground 
+                      hover:border-muted-foreground transition-all active:scale-95"
+                  >
+                    <Plus size={20} />
+                  </button>
+                )}
+                <input
+                  ref={addPhotosInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      handleFilesSelected(Array.from(e.target.files).slice(0, 15 - images.length));
+                    }
+                    e.target.value = '';
+                  }}
+                />
               </div>
             </div>
 
             {/* Preview */}
             {selected && (
-              <div className="surface-card p-3">
+              <div className="surface-card p-2">
                 {selected.processedSrc ? (
                   <BeforeAfterSlider
                     beforeSrc={selected.originalSrc}
@@ -252,26 +292,46 @@ const Index: React.FC = () => {
                       src={selected.originalSrc}
                       alt={selected.name}
                       className="w-full h-full object-contain"
+                      draggable={false}
                     />
                   </div>
                 )}
               </div>
             )}
 
-            {/* Controls Panel */}
-            <div className="surface-card p-4">
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                onClick={handleMagic}
+                className="h-12 rounded-2xl bg-primary text-primary-foreground font-medium gap-2 active:scale-[0.98] transition-transform"
+                disabled={processing}
+              >
+                <Wand2 size={18} /> Magia
+              </Button>
+              <Button
+                onClick={handleReset}
+                variant="outline"
+                className="h-12 rounded-2xl font-medium gap-2 border-border text-foreground hover:bg-secondary active:scale-[0.98] transition-transform"
+                disabled={processing}
+              >
+                <RotateCcw size={18} /> Resetar
+              </Button>
+            </div>
+
+            {/* Controls Panel (collapsible) */}
+            <div className="surface-card">
               <button
                 onClick={() => setShowControls(!showControls)}
-                className="w-full flex items-center justify-between text-sm font-medium text-foreground mb-3"
+                className="w-full flex items-center justify-between text-sm font-medium text-foreground p-4 active:bg-secondary/50 transition-colors rounded-2xl"
               >
                 <span className="flex items-center gap-2">
-                  <ImageIcon size={16} /> Ajustes e Marca d'água
+                  <ImageIcon size={16} className="text-muted-foreground" /> Ajustes Manuais
                 </span>
-                {showControls ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                {showControls ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
               </button>
 
               {showControls && (
-                <div className="space-y-6 animate-fade-in">
+                <div className="px-4 pb-4 space-y-5 animate-fade-in">
                   <EnhanceControls settings={enhance} onChange={setEnhance} />
                   <div className="h-px bg-border" />
                   <WatermarkControls settings={watermark} onChange={setWatermark} />
@@ -283,7 +343,7 @@ const Index: React.FC = () => {
             {batchProgress !== null && (
               <div className="surface-card p-3">
                 <div className="flex items-center gap-3">
-                  <Loader2 size={16} className="text-primary animate-spin" />
+                  <Loader2 size={16} className="text-primary animate-spin flex-shrink-0" />
                   <div className="flex-1">
                     <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                       <div
@@ -292,63 +352,46 @@ const Index: React.FC = () => {
                       />
                     </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">{batchProgress}%</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{batchProgress}%</span>
                 </div>
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                onClick={handleMagic}
-                className="h-12 rounded-2xl bg-primary text-primary-foreground font-medium gap-2"
-                disabled={processing}
-              >
-                <Wand2 size={18} /> Magia Imobiliária
-              </Button>
-              <Button
-                onClick={handleReset}
-                variant="outline"
-                className="h-12 rounded-2xl font-medium gap-2 border-border text-foreground hover:bg-secondary"
-                disabled={processing}
-              >
-                <RotateCcw size={18} /> Resetar
-              </Button>
-            </div>
-
+            {/* Apply Buttons */}
             <div className="grid grid-cols-2 gap-2">
               <Button
                 onClick={handleProcessCurrent}
-                className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover"
+                className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.98] transition-transform"
                 disabled={processing || !selected}
               >
-                {processing && !batchProgress ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+                {processing && batchProgress === null ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
                 Aplicar
               </Button>
               <Button
                 onClick={handleBatchProcess}
-                className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover"
+                className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.98] transition-transform"
                 disabled={processing || images.length === 0}
               >
                 <Layers size={18} />
-                Aplicar Todas ({images.length})
+                Todas ({images.length})
               </Button>
             </div>
 
+            {/* Download / Share */}
             {processedCount > 0 && (
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid gap-2 ${canShare ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <Button
                   onClick={handleDownloadAll}
-                  className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover"
+                  className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.98] transition-transform"
                 >
                   <Download size={18} /> Baixar ({processedCount})
                 </Button>
-                {selected?.processedSrc && navigator.share && (
+                {canShare && selected?.processedSrc && (
                   <Button
                     onClick={() => selected && handleShare(selected)}
-                    className="h-12 rounded-2xl bg-[hsl(142_70%_40%)] text-foreground font-medium gap-2 hover:bg-[hsl(142_70%_35%)]"
+                    className="h-12 rounded-2xl bg-[hsl(142_70%_38%)] text-foreground font-medium gap-2 hover:bg-[hsl(142_70%_32%)] active:scale-[0.98] transition-transform"
                   >
-                    <Share2 size={18} /> WhatsApp
+                    <Share2 size={18} /> Compartilhar
                   </Button>
                 )}
               </div>
@@ -358,8 +401,8 @@ const Index: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="py-3 text-center">
-        <p className="text-xs text-muted-foreground">Filgueira Imobiliária © {new Date().getFullYear()}</p>
+      <footer className="py-3 text-center flex-shrink-0">
+        <p className="text-[11px] text-muted-foreground">Filgueira Imobiliária © {new Date().getFullYear()}</p>
       </footer>
     </div>
   );
