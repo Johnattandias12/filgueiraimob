@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   Wand2, Download, Share2, RotateCcw, ChevronDown, ChevronUp,
-  Layers, ImageIcon, Loader2, Check, Sparkles, Plus, FileDown
+  Layers, ImageIcon, Loader2, Check, Sparkles, Plus, FileDown, ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UploadZone from '@/components/UploadZone';
@@ -167,6 +167,14 @@ const Index: React.FC = () => {
 
       {/* Header */}
       <header className="glass-panel-sm sticky top-0 z-50 px-4 py-2.5 mx-2 mt-2 flex items-center justify-center relative">
+        {images.length > 0 && (
+          <button
+            onClick={() => { setImages([]); setSelectedId(null); setShowControls(false); setEnhance(DEFAULT_ENHANCE); }}
+            className="absolute left-3 w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all active:scale-90"
+          >
+            <ArrowLeft size={18} />
+          </button>
+        )}
         <LogoFilgueira size="sm" />
         {images.length > 0 && (
           <span className="absolute right-3 text-[11px] text-muted-foreground bg-secondary/80 px-2.5 py-1 rounded-lg tabular-nums font-medium">
