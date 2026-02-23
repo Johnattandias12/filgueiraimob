@@ -19,28 +19,28 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({ images, selectedId, onS
   if (images.length === 0) return null;
 
   return (
-    <div className="flex gap-2 overflow-x-auto py-2 px-1 scrollbar-none">
+    <div className="flex gap-2 overflow-x-auto py-1 px-0.5 scrollbar-none scroll-smooth touch-pan-x">
       {images.map((img) => (
         <div
           key={img.id}
           onClick={() => onSelect(img.id)}
           className={`
-            relative flex-shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden cursor-pointer
-            transition-all duration-200 group
+            relative flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden cursor-pointer
+            transition-all duration-200 group touch-manipulation
             ${selectedId === img.id
-              ? 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-105'
-              : 'opacity-70 hover:opacity-100'
+              ? 'ring-2 ring-primary ring-offset-1 ring-offset-background scale-105'
+              : 'opacity-60 hover:opacity-100 active:scale-95'
             }
           `}
         >
-          <img src={img.src} alt={img.name} className="w-full h-full object-cover" />
+          <img src={img.src} alt={img.name} className="w-full h-full object-cover" draggable={false} />
           {img.processed && (
-            <div className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-primary" />
+            <div className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-primary border border-background" />
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onRemove(img.id); }}
-            className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-background/80 
-              flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-background/80 backdrop-blur-sm
+              flex items-center justify-center opacity-0 group-hover:opacity-100 active:opacity-100 transition-opacity"
           >
             <X size={10} className="text-foreground" />
           </button>

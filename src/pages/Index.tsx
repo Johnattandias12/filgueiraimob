@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   Wand2, Download, Share2, RotateCcw, ChevronDown, ChevronUp,
-  Layers, ImageIcon, Loader2, Check, Sparkles, Plus
+  Layers, ImageIcon, Loader2, Check, Sparkles, Plus, FileDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UploadZone from '@/components/UploadZone';
@@ -137,6 +137,10 @@ const Index: React.FC = () => {
     });
   }, [images, handleDownload]);
 
+  const handleDownloadCurrent = useCallback(() => {
+    if (selected) handleDownload(selected);
+  }, [selected, handleDownload]);
+
   const handleShare = useCallback(async (item: ImageItem) => {
     const src = item.processedSrc;
     if (!src) return;
@@ -155,26 +159,31 @@ const Index: React.FC = () => {
   const canShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col relative overflow-hidden app-entrance">
+      {/* Interactive background orbs */}
+      <div className="bg-orb bg-orb-1" />
+      <div className="bg-orb bg-orb-2" />
+      <div className="bg-orb bg-orb-3" />
+
       {/* Header */}
-      <header className="glass-panel-sm sticky top-0 z-50 px-4 py-3 mx-2 mt-2 flex items-center justify-between">
+      <header className="glass-panel-sm sticky top-0 z-50 px-4 py-2.5 mx-2 mt-2 flex items-center justify-between">
         <LogoFilgueira />
         {images.length > 0 && (
-          <span className="text-[11px] text-muted-foreground bg-secondary px-2 py-1 rounded-lg tabular-nums">
+          <span className="text-[11px] text-muted-foreground bg-secondary/80 px-2.5 py-1 rounded-lg tabular-nums font-medium">
             {images.length}/15
           </span>
         )}
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col p-2 gap-2 max-w-2xl mx-auto w-full pb-4">
+      <main className="flex-1 flex flex-col p-2 gap-2 max-w-2xl mx-auto w-full pb-4 relative z-10">
         {images.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4 animate-fade-in">
+          <div className="flex-1 flex flex-col items-center justify-center gap-5 px-4 animate-fade-in">
             <div className="text-center mb-2">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
                 <Sparkles size={28} className="text-primary" />
               </div>
-              <h2 className="text-xl font-semibold text-foreground mb-1.5">Editor de Fotos</h2>
+              <h1 className="text-xl font-bold text-foreground mb-1.5">Editor de Fotos</h1>
               <p className="text-muted-foreground text-sm max-w-[260px] mx-auto leading-relaxed">
                 Aprimore suas fotos imobiliárias e adicione marca d'água em segundos
               </p>
@@ -204,11 +213,11 @@ const Index: React.FC = () => {
                 {images.length < 15 && (
                   <button
                     onClick={() => addPhotosInputRef.current?.click()}
-                    className="flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 border-dashed border-border
-                      flex items-center justify-center text-muted-foreground hover:text-foreground
-                      hover:border-muted-foreground transition-all active:scale-95"
+                    className="flex-shrink-0 w-12 h-12 rounded-xl border-2 border-dashed border-border
+                      flex items-center justify-center text-muted-foreground hover:text-primary
+                      hover:border-primary/50 transition-all active:scale-95"
                   >
-                    <Plus size={20} />
+                    <Plus size={18} />
                   </button>
                 )}
                 <input
@@ -229,7 +238,7 @@ const Index: React.FC = () => {
 
             {/* Preview */}
             {selected && (
-              <div className="surface-card p-2">
+              <div className="surface-card p-2 transition-all duration-300">
                 {selected.processedSrc ? (
                   <BeforeAfterSlider beforeSrc={selected.originalSrc} afterSrc={selected.processedSrc} />
                 ) : (
@@ -244,7 +253,7 @@ const Index: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <Button
                 onClick={handleMagic}
-                className="h-12 rounded-2xl bg-primary text-primary-foreground font-medium gap-2 active:scale-[0.98] transition-transform"
+                className="h-12 rounded-2xl bg-primary text-primary-foreground font-medium gap-2 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-primary/20"
                 disabled={processing}
               >
                 <Wand2 size={18} /> Magia
@@ -252,7 +261,7 @@ const Index: React.FC = () => {
               <Button
                 onClick={handleReset}
                 variant="outline"
-                className="h-12 rounded-2xl font-medium gap-2 border-border text-foreground hover:bg-secondary active:scale-[0.98] transition-transform"
+                className="h-12 rounded-2xl font-medium gap-2 border-border text-foreground hover:bg-secondary active:scale-[0.97] transition-all duration-200"
                 disabled={processing}
               >
                 <RotateCcw size={18} /> Resetar
@@ -260,28 +269,28 @@ const Index: React.FC = () => {
             </div>
 
             {/* Controls */}
-            <div className="surface-card">
+            <div className="surface-card overflow-hidden transition-all duration-300">
               <button
                 onClick={() => setShowControls(!showControls)}
-                className="w-full flex items-center justify-between text-sm font-medium text-foreground p-4 active:bg-secondary/50 transition-colors rounded-2xl"
+                className="w-full flex items-center justify-between text-sm font-medium text-foreground p-4 active:bg-secondary/50 transition-colors"
               >
                 <span className="flex items-center gap-2">
                   <ImageIcon size={16} className="text-muted-foreground" /> Ajustes Manuais
                 </span>
-                {showControls ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+                <ChevronDown size={16} className={`text-muted-foreground transition-transform duration-300 ${showControls ? 'rotate-180' : ''}`} />
               </button>
-              {showControls && (
-                <div className="px-4 pb-4 space-y-5 animate-fade-in">
+              <div className={`overflow-hidden transition-all duration-300 ${showControls ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className="px-4 pb-4 space-y-5">
                   <EnhanceControls settings={enhance} onChange={setEnhance} />
                   <div className="h-px bg-border" />
                   <WatermarkControls settings={watermark} onChange={setWatermark} />
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Progress */}
             {batchProgress !== null && (
-              <div className="surface-card p-3">
+              <div className="surface-card p-3 animate-fade-in">
                 <div className="flex items-center gap-3">
                   <Loader2 size={16} className="text-primary animate-spin flex-shrink-0" />
                   <div className="flex-1">
@@ -298,7 +307,7 @@ const Index: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <Button
                 onClick={handleProcessCurrent}
-                className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.98] transition-transform"
+                className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.97] transition-all duration-200"
                 disabled={processing || !selected}
               >
                 {processing && batchProgress === null ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
@@ -306,7 +315,7 @@ const Index: React.FC = () => {
               </Button>
               <Button
                 onClick={handleBatchProcess}
-                className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.98] transition-transform"
+                className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.97] transition-all duration-200"
                 disabled={processing || images.length === 0}
               >
                 <Layers size={18} /> Todas ({images.length})
@@ -315,17 +324,26 @@ const Index: React.FC = () => {
 
             {/* Download / Share */}
             {processedCount > 0 && (
-              <div className={`grid gap-2 ${canShare ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                <Button
-                  onClick={handleDownloadAll}
-                  className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.98] transition-transform"
-                >
-                  <Download size={18} /> Baixar ({processedCount})
-                </Button>
+              <div className="space-y-2 animate-fade-in">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={handleDownloadCurrent}
+                    className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.97] transition-all duration-200"
+                    disabled={!selected?.processedSrc}
+                  >
+                    <FileDown size={18} /> Baixar Atual
+                  </Button>
+                  <Button
+                    onClick={handleDownloadAll}
+                    className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.97] transition-all duration-200"
+                  >
+                    <Download size={18} /> Todas ({processedCount})
+                  </Button>
+                </div>
                 {canShare && selected?.processedSrc && (
                   <Button
                     onClick={() => selected && handleShare(selected)}
-                    className="h-12 rounded-2xl bg-[hsl(142_70%_38%)] text-foreground font-medium gap-2 hover:bg-[hsl(142_70%_32%)] active:scale-[0.98] transition-transform"
+                    className="w-full h-12 rounded-2xl bg-accent/15 text-accent font-medium gap-2 hover:bg-accent/25 active:scale-[0.97] transition-all duration-200 border border-accent/20"
                   >
                     <Share2 size={18} /> Compartilhar
                   </Button>
@@ -336,8 +354,8 @@ const Index: React.FC = () => {
         )}
       </main>
 
-      <footer className="py-3 text-center flex-shrink-0">
-        <p className="text-[11px] text-muted-foreground">Filgueira Imobiliária © {new Date().getFullYear()}</p>
+      <footer className="py-3 text-center flex-shrink-0 relative z-10">
+        <p className="text-[11px] text-muted-foreground/60">Filgueira Imobiliária © {new Date().getFullYear()}</p>
       </footer>
     </div>
   );
