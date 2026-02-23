@@ -1,42 +1,46 @@
 import React from 'react';
 
-const LogoFilgueira: React.FC<{ className?: string }> = ({ className }) => (
-  <div className={`flex items-center gap-2.5 select-none ${className || ''}`}>
-    <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
+interface LogoFilgueiraProps {
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+const sizes = {
+  sm: { main: '18px', sub: '7px', gap: '0px' },
+  md: { main: '28px', sub: '10px', gap: '1px' },
+  lg: { main: '42px', sub: '14px', gap: '2px' },
+};
+
+const LogoFilgueira: React.FC<LogoFilgueiraProps> = ({ className, size = 'md' }) => {
+  const s = sizes[size];
+  return (
+    <div className={`flex flex-col items-center justify-center select-none ${className || ''}`}>
       <span
-        className="text-primary font-black text-lg leading-none"
-        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif' }}
-      >
-        F
-      </span>
-    </div>
-    <div className="flex flex-col">
-      <span
-        className="text-foreground leading-none tracking-tight"
+        className="text-foreground leading-none"
         style={{
           fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Roboto", "Helvetica Neue", sans-serif',
-          fontSize: '20px',
-          fontWeight: 800,
-          letterSpacing: '-0.5px',
+          fontSize: s.main,
+          fontWeight: 900,
+          letterSpacing: '-1.5px',
+          lineHeight: 0.9,
         }}
       >
         Filgueira
       </span>
       <span
-        className="text-muted-foreground"
+        className="text-foreground/70"
         style={{
           fontFamily: 'Georgia, "Times New Roman", serif',
-          fontSize: '9px',
-          fontWeight: 600,
-          letterSpacing: '1.5px',
-          textTransform: 'uppercase',
-          marginTop: '1px',
+          fontSize: s.sub,
+          fontWeight: 700,
+          letterSpacing: '0.5px',
+          marginTop: s.gap,
         }}
       >
         Imobiliária
       </span>
     </div>
-  </div>
-);
+  );
+};
 
 export default LogoFilgueira;
