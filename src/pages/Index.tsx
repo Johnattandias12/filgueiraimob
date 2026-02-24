@@ -50,7 +50,10 @@ const Index: React.FC = () => {
       name: file.name,
       type: isVideoFile(file) ? 'video' as const : 'image' as const,
     }));
-    setImages(prev => [...prev, ...newItems].slice(0, 40));
+    setImages(prev => {
+      const combined = [...prev, ...newItems].slice(0, 40);
+      return combined;
+    });
     setSelectedId(prev => prev || newItems[0]?.id || null);
     setShowControls(true);
   }, []);
@@ -58,23 +61,23 @@ const Index: React.FC = () => {
   const handleRemove = useCallback((id: string) => {
     setImages(prev => {
       const removed = prev.find(i => i.id === id);
-      if (removed) URL.revokeObjectURL(removed.originalSrc);
-      return prev.filter(i => i.id !== id);
-    });
-    setSelectedId(prev => {
-      if (prev !== id) return prev;
-      // Use functional form — no stale closure
-      let next: string | null = null;
-      setImages(currentImages => {
-        const remaining = currentImages.filter(i => i.id !== id);
-        next = remaining[0]?.id || null;
-        return currentImages; // don't mutate, just read
+      if (removed) {
+        URL.revokeObjectURL(removed.originalSrc);
+        if (removed.processedSrc) URL.revokeObjectURL(removed.processedSrc);
+      }
+      const remaining = prev.filter(i => i.id !== id);
+      // Update selection if the removed item was selected
+      setSelectedId(sel => {
+        if (sel !== id) return sel;
+        return remaining[0]?.id || null;
       });
-      return next;
+      return remaining;
     });
   }, []);
 
   const processItem = useCallback(async (item: MediaItem, enh: EnhanceSettings, wm: WatermarkSettings) => {
+    // Revoke old processed URL to free memory (important on iOS)
+    if (item.processedSrc) URL.revokeObjectURL(item.processedSrc);
     if (item.type === 'video') {
       return processVideo(item.file, {
         enhance: enh,
@@ -187,11 +190,15 @@ const Index: React.FC = () => {
   }, []);
 
   const handleGoBack = useCallback(() => {
-    images.forEach(img => URL.revokeObjectURL(img.originalSrc));
+    images.forEach(img => {
+      URL.revokeObjectURL(img.originalSrc);
+      if (img.processedSrc) URL.revokeObjectURL(img.processedSrc);
+    });
     setImages([]);
     setSelectedId(null);
     setShowControls(false);
     setEnhance(DEFAULT_ENHANCE);
+    setWatermark(DEFAULT_WATERMARK);
   }, [images]);
 
   const thumbnails = useMemo(() => images.map(i => ({
