@@ -15,23 +15,26 @@ import {
   DEFAULT_ENHANCE, REAL_ESTATE_MAGIC, DEFAULT_WATERMARK,
   processImage, dataURLtoBlob,
 } from '@/lib/imageEngine';
+import { processVideo, isVideoFile } from '@/lib/videoEngine';
 
-interface ImageItem {
+interface MediaItem {
   id: string;
   file: File;
   originalSrc: string;
   processedSrc: string | null;
   name: string;
+  type: 'image' | 'video';
 }
 
 const Index: React.FC = () => {
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [images, setImages] = useState<MediaItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [enhance, setEnhance] = useState<EnhanceSettings>(DEFAULT_ENHANCE);
   const [watermark, setWatermark] = useState<WatermarkSettings>(DEFAULT_WATERMARK);
   const [showControls, setShowControls] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [batchProgress, setBatchProgress] = useState<number | null>(null);
+  const [ffmpegLoading, setFfmpegLoading] = useState(false);
   const addPhotosInputRef = useRef<HTMLInputElement>(null);
 
   const selected = images.find(i => i.id === selectedId) || null;
@@ -39,15 +42,16 @@ const Index: React.FC = () => {
   const canShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   const handleFilesSelected = useCallback((files: File[]) => {
-    const newImages: ImageItem[] = files.map(file => ({
+    const newItems: MediaItem[] = files.map(file => ({
       id: crypto.randomUUID(),
       file,
       originalSrc: URL.createObjectURL(file),
       processedSrc: null,
       name: file.name,
+      type: isVideoFile(file) ? 'video' as const : 'image' as const,
     }));
-    setImages(prev => [...prev, ...newImages].slice(0, 40));
-    setSelectedId(prev => prev || newImages[0]?.id || null);
+    setImages(prev => [...prev, ...newItems].slice(0, 40));
+    setSelectedId(prev => prev || newItems[0]?.id || null);
     setShowControls(true);
   }, []);
 
@@ -70,11 +74,23 @@ const Index: React.FC = () => {
     });
   }, []);
 
+  const processItem = useCallback(async (item: MediaItem, enh: EnhanceSettings, wm: WatermarkSettings) => {
+    if (item.type === 'video') {
+      return processVideo(item.file, {
+        enhance: enh,
+        watermark: wm,
+        onProgress: (pct) => setBatchProgress(pct),
+      });
+    }
+    return processImage(item.originalSrc, enh, wm);
+  }, []);
+
   const handleProcessCurrent = useCallback(async () => {
     if (!selected) return;
     setProcessing(true);
+    if (selected.type === 'video') setFfmpegLoading(true);
     try {
-      const result = await processImage(selected.originalSrc, enhance, watermark);
+      const result = await processItem(selected, enhance, watermark);
       setImages(prev => prev.map(i =>
         i.id === selected.id ? { ...i, processedSrc: result } : i
       ));
@@ -82,14 +98,17 @@ const Index: React.FC = () => {
       console.error('Processing failed:', e);
     }
     setProcessing(false);
-  }, [selected, enhance, watermark]);
+    setFfmpegLoading(false);
+    setBatchProgress(null);
+  }, [selected, enhance, watermark, processItem]);
 
   const handleMagic = useCallback(async () => {
     setEnhance(REAL_ESTATE_MAGIC);
     if (!selected) return;
     setProcessing(true);
+    if (selected.type === 'video') setFfmpegLoading(true);
     try {
-      const result = await processImage(selected.originalSrc, REAL_ESTATE_MAGIC, watermark);
+      const result = await processItem(selected, REAL_ESTATE_MAGIC, watermark);
       setImages(prev => prev.map(i =>
         i.id === selected.id ? { ...i, processedSrc: result } : i
       ));
@@ -97,7 +116,9 @@ const Index: React.FC = () => {
       console.error('Processing failed:', e);
     }
     setProcessing(false);
-  }, [selected, watermark]);
+    setFfmpegLoading(false);
+    setBatchProgress(null);
+  }, [selected, watermark, processItem]);
 
   const handleReset = useCallback(() => {
     setEnhance(DEFAULT_ENHANCE);
@@ -114,12 +135,11 @@ const Index: React.FC = () => {
     try {
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
-        const result = await processImage(img.originalSrc, enhance, watermark);
+        const result = await processItem(img, enhance, watermark);
         setImages(prev => prev.map(item =>
           item.id === img.id ? { ...item, processedSrc: result } : item
         ));
         setBatchProgress(Math.round(((i + 1) / images.length) * 100));
-        // Yield to UI thread between images
         await new Promise(r => setTimeout(r, 0));
       }
     } catch (e) {
@@ -127,9 +147,9 @@ const Index: React.FC = () => {
     }
     setProcessing(false);
     setBatchProgress(null);
-  }, [images, enhance, watermark]);
+  }, [images, enhance, watermark, processItem]);
 
-  const handleDownload = useCallback((item: ImageItem) => {
+  const handleDownload = useCallback((item: MediaItem) => {
     const src = item.processedSrc || item.originalSrc;
     const a = document.createElement('a');
     a.href = src;
@@ -150,12 +170,14 @@ const Index: React.FC = () => {
     if (selected) handleDownload(selected);
   }, [selected, handleDownload]);
 
-  const handleShare = useCallback(async (item: ImageItem) => {
+  const handleShare = useCallback(async (item: MediaItem) => {
     const src = item.processedSrc;
     if (!src) return;
     try {
-      const blob = dataURLtoBlob(src);
-      const file = new File([blob], `filgueira_${item.name}`, { type: 'image/jpeg' });
+      const mimeType = item.type === 'video' ? 'video/mp4' : 'image/jpeg';
+      const response = await fetch(src);
+      const blob = await response.blob();
+      const file = new File([blob], `filgueira_${item.name}`, { type: mimeType });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: 'Filgueira Imobiliária' });
       }
@@ -177,6 +199,7 @@ const Index: React.FC = () => {
     src: i.processedSrc || i.originalSrc,
     name: i.name,
     processed: !!i.processedSrc,
+    type: i.type,
   })), [images]);
 
   return (
@@ -212,9 +235,9 @@ const Index: React.FC = () => {
               <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
                 <Sparkles size={28} className="text-primary" />
               </div>
-              <h1 className="text-xl font-bold text-foreground mb-1.5">Editor de Fotos</h1>
+              <h1 className="text-xl font-bold text-foreground mb-1.5">Editor de Mídia</h1>
               <p className="text-muted-foreground text-sm max-w-[260px] mx-auto leading-relaxed">
-                Aprimore suas fotos imobiliárias e adicione marca d'água em segundos
+                Aprimore suas fotos e vídeos imobiliários e adicione marca d'água em segundos
               </p>
             </div>
             <div className="w-full max-w-sm">
@@ -247,7 +270,7 @@ const Index: React.FC = () => {
                 <input
                   ref={addPhotosInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   multiple
                   className="hidden"
                   onChange={(e) => {
@@ -263,7 +286,22 @@ const Index: React.FC = () => {
             {/* Preview */}
             {selected && (
               <div className="surface-card p-2">
-                {selected.processedSrc ? (
+                {selected.type === 'video' ? (
+                  <div className="relative rounded-2xl overflow-hidden bg-card aspect-video">
+                    <video
+                      src={selected.processedSrc || selected.originalSrc}
+                      className="w-full h-full object-contain"
+                      controls
+                      playsInline
+                      muted
+                    />
+                    {selected.processedSrc && (
+                      <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-primary/80 backdrop-blur-sm text-primary-foreground text-[10px] font-semibold px-2 py-1 rounded-lg">
+                        <Check size={12} /> Processado
+                      </div>
+                    )}
+                  </div>
+                ) : selected.processedSrc ? (
                   <BeforeAfterSlider beforeSrc={selected.originalSrc} afterSrc={selected.processedSrc} />
                 ) : (
                   <div className="relative rounded-2xl overflow-hidden bg-card aspect-[4/3]">
@@ -274,6 +312,12 @@ const Index: React.FC = () => {
                       draggable={false}
                       loading="eager"
                     />
+                  </div>
+                )}
+                {ffmpegLoading && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground animate-fade-in">
+                    <Loader2 size={14} className="animate-spin text-primary" />
+                    <span>Processando vídeo com FFmpeg…</span>
                   </div>
                 )}
               </div>

@@ -1,11 +1,12 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Video } from 'lucide-react';
 
 interface ImageThumbnail {
   id: string;
   src: string;
   name: string;
   processed?: boolean;
+  type?: 'image' | 'video';
 }
 
 interface ThumbnailStripProps {
@@ -33,7 +34,13 @@ const ThumbnailStrip: React.FC<ThumbnailStripProps> = ({ images, selectedId, onS
             }
           `}
         >
-          <img src={img.src} alt={img.name} className="w-full h-full object-cover" draggable={false} />
+          {img.type === 'video' ? (
+            <div className="w-full h-full bg-secondary flex items-center justify-center">
+              <Video size={20} className="text-muted-foreground" />
+            </div>
+          ) : (
+            <img src={img.src} alt={img.name} className="w-full h-full object-cover" draggable={false} />
+          )}
           {img.processed && (
             <div className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-primary border border-background" />
           )}
