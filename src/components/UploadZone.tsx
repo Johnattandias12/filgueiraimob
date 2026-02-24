@@ -14,7 +14,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onFilesSelected, maxFiles = 40 
   const handleFiles = useCallback((fileList: FileList | null) => {
     if (!fileList) return;
     const files = Array.from(fileList)
-      .filter(f => f.type.startsWith('image/'))
+      .filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
       .slice(0, maxFiles);
     if (files.length > 0) onFilesSelected(files);
   }, [onFilesSelected, maxFiles]);
@@ -76,14 +76,14 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onFilesSelected, maxFiles = 40 
           {isDragging ? 'Solte as fotos aqui' : 'Arraste ou toque para selecionar'}
         </p>
         <p className="text-muted-foreground text-xs mt-1">
-          Até {maxFiles} imagens • JPG, PNG, WebP
+          Até {maxFiles} arquivos • JPG, PNG, WebP, MP4
         </p>
       </div>
 
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         multiple
         className="hidden"
         onChange={(e) => { handleFiles(e.target.files); if (e.target) e.target.value = ''; }}
