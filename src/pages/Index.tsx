@@ -46,7 +46,7 @@ const Index: React.FC = () => {
       processedSrc: null,
       name: file.name,
     }));
-    setImages(prev => [...prev, ...newImages].slice(0, 15));
+    setImages(prev => [...prev, ...newImages].slice(0, 40));
     setSelectedId(prev => prev || newImages[0]?.id || null);
     setShowControls(true);
   }, []);
@@ -199,7 +199,7 @@ const Index: React.FC = () => {
         <LogoFilgueira size="sm" />
         {images.length > 0 && (
           <span className="absolute right-3 text-[11px] text-muted-foreground bg-secondary/80 px-2.5 py-1 rounded-lg tabular-nums font-medium">
-            {images.length}/15
+            {images.length}/40
           </span>
         )}
       </header>
@@ -234,7 +234,7 @@ const Index: React.FC = () => {
                     onRemove={handleRemove}
                   />
                 </div>
-                {images.length < 15 && (
+                {images.length < 40 && (
                   <button
                     onClick={() => addPhotosInputRef.current?.click()}
                     className="flex-shrink-0 w-12 h-12 rounded-xl border-2 border-dashed border-border
@@ -252,7 +252,7 @@ const Index: React.FC = () => {
                   className="hidden"
                   onChange={(e) => {
                     if (e.target.files) {
-                      handleFilesSelected(Array.from(e.target.files).slice(0, 15 - images.length));
+                      handleFilesSelected(Array.from(e.target.files).slice(0, 40 - images.length));
                     }
                     e.target.value = '';
                   }}

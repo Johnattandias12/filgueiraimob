@@ -6,7 +6,7 @@ interface UploadZoneProps {
   maxFiles?: number;
 }
 
-const UploadZone: React.FC<UploadZoneProps> = ({ onFilesSelected, maxFiles = 15 }) => {
+const UploadZone: React.FC<UploadZoneProps> = ({ onFilesSelected, maxFiles = 40 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
