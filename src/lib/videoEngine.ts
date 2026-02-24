@@ -134,9 +134,8 @@ function getVideoDimensions(src: string): Promise<{ width: number; height: numbe
  * Returns scale filter string or empty string if already small enough.
  */
 function getScaleFilter(w: number, h: number): string {
-  const MAX = 720;
+  const MAX = 1080;
   if (w <= MAX && h <= MAX) return '';
-  // Scale the largest dimension to MAX, keep aspect ratio, ensure even dimensions
   if (w >= h) {
     return `scale=${MAX}:-2`;
   }
@@ -179,10 +178,10 @@ export async function processVideo(
 
   // Determine output dimensions for watermark
   const outputW = scaleFilter
-    ? (dims.width >= dims.height ? 720 : Math.round((dims.width / dims.height) * 720 / 2) * 2)
+    ? (dims.width >= dims.height ? 1080 : Math.round((dims.width / dims.height) * 1080 / 2) * 2)
     : dims.width;
   const outputH = scaleFilter
-    ? (dims.height >= dims.width ? 720 : Math.round((dims.height / dims.width) * 720 / 2) * 2)
+    ? (dims.height >= dims.width ? 1080 : Math.round((dims.height / dims.width) * 1080 / 2) * 2)
     : dims.height;
 
   filters.push(buildColorFilter(enhance));
@@ -211,10 +210,10 @@ export async function processVideo(
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
     '-tune', 'fastdecode',
-    '-crf', '28',       // Higher CRF = faster, slightly lower quality but fine for real estate
+    '-crf', '20',       // Good quality, balanced with speed
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
-    '-b:a', '96k',      // Lower audio bitrate for speed
+    '-b:a', '128k',
     '-movflags', '+faststart',
     '-y',
     'output.mp4'
