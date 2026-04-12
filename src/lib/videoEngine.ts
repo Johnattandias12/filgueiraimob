@@ -5,6 +5,9 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { EnhanceSettings, WatermarkSettings } from './imageEngine';
 
+// Limite de tamanho de vídeo: 500MB
+const MAX_VIDEO_SIZE_BYTES = 500 * 1024 * 1024;
+
 let ffmpeg: FFmpeg | null = null;
 let loadPromise: Promise<void> | null = null;
 let progressHandler: ((e: { progress: number }) => void) | null = null;
@@ -79,7 +82,6 @@ function generateWatermarkPNG(
   ctx.font = `700 ${subFontSize}px Georgia, "Times New Roman", serif`;
   ctx.fillText('Imobiliária', cx, cy + mainFontSize * 0.45);
 
-  // Convert canvas to PNG bytes
   const dataURL = canvas.toDataURL('image/png');
   const binaryStr = atob(dataURL.split(',')[1]);
   const bytes = new Uint8Array(binaryStr.length);
@@ -111,27 +113,42 @@ export interface VideoProcessOptions {
 
 /**
  * Probe video dimensions using a <video> element.
+ * Revokes the objectURL properly in both success and error paths.
  */
 function getVideoDimensions(src: string): Promise<{ width: number; height: number; duration: number }> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.preload = 'metadata';
+
+    const cleanup = () => URL.revokeObjectURL(video.src);
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timeout ao ler metadados do vídeo'));
+    }, 15_000);
+
     video.onloadedmetadata = () => {
+      clearTimeout(timeout);
+      cleanup();
       resolve({
         width: video.videoWidth,
         height: video.videoHeight,
         duration: video.duration,
       });
-      URL.revokeObjectURL(video.src);
     };
-    video.onerror = reject;
+
+    video.onerror = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error('Falha ao carregar metadados do vídeo'));
+    };
+
     video.src = src;
   });
 }
 
 /**
- * Clamp video to max 720p for speed on mobile (iPhone especially).
- * Returns scale filter string or empty string if already small enough.
+ * Clamp video to max 1080p for speed on mobile (iPhone especially).
  */
 function getScaleFilter(w: number, h: number): string {
   const MAX = 1080;
@@ -140,6 +157,31 @@ function getScaleFilter(w: number, h: number): string {
     return `scale=${MAX}:-2`;
   }
   return `scale=-2:${MAX}`;
+}
+
+/**
+ * Calculate output dimensions after scaling, matching what FFmpeg -2 produces.
+ * Ensures the result is always divisible by 2 (required by yuv420p).
+ */
+function getOutputDimensions(
+  origW: number,
+  origH: number,
+  scaleFilter: string
+): { w: number; h: number } {
+  if (!scaleFilter) return { w: origW, h: origH };
+
+  const MAX = 1080;
+  if (origW >= origH) {
+    // scale=1080:-2  →  width fixed, height auto
+    const w = MAX;
+    const h = Math.round((origH / origW) * MAX / 2) * 2;
+    return { w, h };
+  } else {
+    // scale=-2:1080  →  height fixed, width auto
+    const h = MAX;
+    const w = Math.round((origW / origH) * MAX / 2) * 2;
+    return { w, h };
+  }
 }
 
 /**
@@ -152,44 +194,39 @@ export async function processVideo(
 ): Promise<string> {
   const { enhance, watermark, onProgress } = options;
 
+  if (file.size > MAX_VIDEO_SIZE_BYTES) {
+    throw new Error(`Vídeo muito grande (${(file.size / 1024 / 1024).toFixed(0)}MB). Tamanho máximo: 500MB.`);
+  }
+
   const ff = await getFFmpeg();
 
-  // Clean up previous progress handler to avoid listener leak
+  // Remove handler anterior para evitar vazamento de listener
   if (progressHandler) {
     ff.off('progress', progressHandler);
     progressHandler = null;
   }
 
-  // Write input file
+  // Escreve arquivo de entrada
   const inputData = await fetchFile(file);
   await ff.writeFile('input.mp4', inputData);
 
-  // Get video dimensions for scaling + watermark
-  const objectURL = URL.createObjectURL(file);
-  const dims = await getVideoDimensions(objectURL);
-  URL.revokeObjectURL(objectURL);
+  // Cria objectURL separado para leitura de metadados (será revogado dentro da função)
+  const metaURL = URL.createObjectURL(file);
+  const dims = await getVideoDimensions(metaURL);
 
-  // Build filter chain
+  // Monta cadeia de filtros
   const filters: string[] = [];
 
-  // Scale down for speed on mobile
   const scaleFilter = getScaleFilter(dims.width, dims.height);
   if (scaleFilter) filters.push(scaleFilter);
 
-  // Determine output dimensions for watermark
-  const outputW = scaleFilter
-    ? (dims.width >= dims.height ? 1080 : Math.round((dims.width / dims.height) * 1080 / 2) * 2)
-    : dims.width;
-  const outputH = scaleFilter
-    ? (dims.height >= dims.width ? 1080 : Math.round((dims.height / dims.width) * 1080 / 2) * 2)
-    : dims.height;
+  const { w: outputW, h: outputH } = getOutputDimensions(dims.width, dims.height, scaleFilter);
 
   filters.push(buildColorFilter(enhance));
 
   const warmthFilter = buildWarmthFilter(enhance.warmth);
   if (warmthFilter) filters.push(warmthFilter);
 
-  // Build FFmpeg command
   const args: string[] = ['-i', 'input.mp4'];
 
   if (watermark.enabled) {
@@ -205,12 +242,11 @@ export async function processVideo(
     args.push('-vf', filters.join(','));
   }
 
-  // Output settings — optimized for speed on mobile/iOS
   args.push(
     '-c:v', 'libx264',
     '-preset', 'ultrafast',
     '-tune', 'fastdecode',
-    '-crf', '20',       // Good quality, balanced with speed
+    '-crf', '20',
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
     '-b:a', '128k',
@@ -219,7 +255,6 @@ export async function processVideo(
     'output.mp4'
   );
 
-  // Track progress — single handler, cleaned up properly
   if (onProgress) {
     progressHandler = ({ progress }) => {
       onProgress(Math.round(Math.min(progress, 1) * 100));
@@ -227,19 +262,19 @@ export async function processVideo(
     ff.on('progress', progressHandler);
   }
 
-  await ff.exec(args);
-
-  // Clean up progress handler
-  if (progressHandler) {
-    ff.off('progress', progressHandler);
-    progressHandler = null;
+  try {
+    await ff.exec(args);
+  } finally {
+    // Garante remoção do handler mesmo se exec falhar
+    if (progressHandler) {
+      ff.off('progress', progressHandler);
+      progressHandler = null;
+    }
   }
 
-  // Read output
   const outputData = await ff.readFile('output.mp4');
   const blob = new Blob([outputData as unknown as BlobPart], { type: 'video/mp4' });
 
-  // Cleanup temp files
   try { await ff.deleteFile('input.mp4'); } catch {}
   try { await ff.deleteFile('output.mp4'); } catch {}
   try { await ff.deleteFile('watermark.png'); } catch {}

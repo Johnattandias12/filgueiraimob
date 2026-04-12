@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   Wand2, Download, Share2, RotateCcw, ChevronDown,
-  Layers, ImageIcon, Loader2, Check, Sparkles, Plus, FileDown, ArrowLeft
+  Layers, ImageIcon, Loader2, Check, Sparkles, Plus, FileDown, ArrowLeft,
+  PackageOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UploadZone from '@/components/UploadZone';
@@ -13,7 +14,7 @@ import LogoFilgueira from '@/components/LogoFilgueira';
 import {
   EnhanceSettings, WatermarkSettings,
   DEFAULT_ENHANCE, REAL_ESTATE_MAGIC, DEFAULT_WATERMARK,
-  processImage, dataURLtoBlob,
+  processImage,
 } from '@/lib/imageEngine';
 import { processVideo, isVideoFile } from '@/lib/videoEngine';
 
@@ -35,6 +36,8 @@ const Index: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [batchProgress, setBatchProgress] = useState<number | null>(null);
   const [ffmpegLoading, setFfmpegLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const addPhotosInputRef = useRef<HTMLInputElement>(null);
 
   const selected = images.find(i => i.id === selectedId) || null;
@@ -66,7 +69,6 @@ const Index: React.FC = () => {
         if (removed.processedSrc) URL.revokeObjectURL(removed.processedSrc);
       }
       const remaining = prev.filter(i => i.id !== id);
-      // Update selection if the removed item was selected
       setSelectedId(sel => {
         if (sel !== id) return sel;
         return remaining[0]?.id || null;
@@ -76,7 +78,6 @@ const Index: React.FC = () => {
   }, []);
 
   const processItem = useCallback(async (item: MediaItem, enh: EnhanceSettings, wm: WatermarkSettings) => {
-    // Revoke old processed URL to free memory (important on iOS)
     if (item.processedSrc) URL.revokeObjectURL(item.processedSrc);
     if (item.type === 'video') {
       return processVideo(item.file, {
@@ -135,52 +136,109 @@ const Index: React.FC = () => {
   const handleBatchProcess = useCallback(async () => {
     setProcessing(true);
     setBatchProgress(0);
-    try {
-      for (let i = 0; i < images.length; i++) {
-        const img = images[i];
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      try {
         const result = await processItem(img, enhance, watermark);
         setImages(prev => prev.map(item =>
           item.id === img.id ? { ...item, processedSrc: result } : item
         ));
-        setBatchProgress(Math.round(((i + 1) / images.length) * 100));
-        await new Promise(r => setTimeout(r, 0));
+      } catch (e) {
+        console.error(`Failed to process ${img.name}:`, e);
       }
-    } catch (e) {
-      console.error('Batch processing failed:', e);
+      setBatchProgress(Math.round(((i + 1) / images.length) * 100));
+      await new Promise(r => setTimeout(r, 0));
     }
     setProcessing(false);
     setBatchProgress(null);
   }, [images, enhance, watermark, processItem]);
 
+  // Baixar arquivo único
   const handleDownload = useCallback((item: MediaItem) => {
     const src = item.processedSrc || item.originalSrc;
+    const ext = item.type === 'video' ? 'mp4' : 'jpg';
+    const baseName = item.name.replace(/\.[^.]+$/, '');
     const a = document.createElement('a');
     a.href = src;
-    a.download = `filgueira_${item.name}`;
+    a.download = `filgueira_${baseName}.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   }, []);
 
-  const handleDownloadAll = useCallback(() => {
+  // Baixar TODAS as mídias processadas em um único ZIP
+  const handleDownloadAll = useCallback(async () => {
     const processed = images.filter(i => i.processedSrc);
-    processed.forEach((img, index) => {
-      setTimeout(() => handleDownload(img), index * 300);
-    });
+    if (processed.length === 0) return;
+
+    // Se for apenas 1 arquivo, baixa direto sem ZIP
+    if (processed.length === 1) {
+      handleDownload(processed[0]);
+      return;
+    }
+
+    setDownloading(true);
+    setDownloadProgress(0);
+
+    try {
+      const { default: JSZip } = await import('jszip');
+      const zip = new JSZip();
+
+      for (let i = 0; i < processed.length; i++) {
+        const item = processed[i];
+        const src = item.processedSrc!;
+
+        // Busca o blob — funciona tanto para data: URLs quanto blob: URLs
+        const response = await fetch(src);
+        const blob = await response.blob();
+
+        const ext = item.type === 'video' ? 'mp4' : 'jpg';
+        const baseName = item.name.replace(/\.[^.]+$/, '');
+        zip.file(`filgueira_${baseName}.${ext}`, blob);
+
+        setDownloadProgress(Math.round(((i + 1) / processed.length) * 100));
+      }
+
+      const zipBlob = await zip.generateAsync(
+        { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 1 } },
+        (meta) => setDownloadProgress(Math.round(meta.percent))
+      );
+
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `filgueira_midias_${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+    } catch (e) {
+      console.error('ZIP download failed:', e);
+      // Fallback: baixa arquivos individualmente
+      processed.forEach((img, index) => {
+        setTimeout(() => handleDownload(img), index * 400);
+      });
+    }
+
+    setDownloading(false);
+    setDownloadProgress(null);
   }, [images, handleDownload]);
 
   const handleDownloadCurrent = useCallback(() => {
     if (selected) handleDownload(selected);
   }, [selected, handleDownload]);
 
+  // Compartilhar arquivo único
   const handleShare = useCallback(async (item: MediaItem) => {
     const src = item.processedSrc;
     if (!src) return;
     try {
       const mimeType = item.type === 'video' ? 'video/mp4' : 'image/jpeg';
+      const ext = item.type === 'video' ? 'mp4' : 'jpg';
+      const baseName = item.name.replace(/\.[^.]+$/, '');
       const response = await fetch(src);
       const blob = await response.blob();
-      const file = new File([blob], `filgueira_${item.name}`, { type: mimeType });
+      const file = new File([blob], `filgueira_${baseName}.${ext}`, { type: mimeType });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: 'Filgueira Imobiliária' });
       }
@@ -188,6 +246,48 @@ const Index: React.FC = () => {
       console.warn('Share failed:', e);
     }
   }, []);
+
+  // Compartilhar TODAS as mídias processadas de uma vez (WhatsApp/galeria)
+  const handleShareAll = useCallback(async () => {
+    const processed = images.filter(i => i.processedSrc);
+    if (processed.length === 0) return;
+
+    // Se for apenas 1, usa share simples
+    if (processed.length === 1) {
+      await handleShare(processed[0]);
+      return;
+    }
+
+    setDownloading(true);
+    setDownloadProgress(0);
+
+    try {
+      const files: File[] = [];
+      for (let i = 0; i < processed.length; i++) {
+        const item = processed[i];
+        const mimeType = item.type === 'video' ? 'video/mp4' : 'image/jpeg';
+        const ext = item.type === 'video' ? 'mp4' : 'jpg';
+        const baseName = item.name.replace(/\.[^.]+$/, '');
+        const response = await fetch(item.processedSrc!);
+        const blob = await response.blob();
+        files.push(new File([blob], `filgueira_${baseName}.${ext}`, { type: mimeType }));
+        setDownloadProgress(Math.round(((i + 1) / processed.length) * 100));
+      }
+
+      if (navigator.share && navigator.canShare?.({ files })) {
+        await navigator.share({ files, title: 'Filgueira Imobiliária' });
+      } else {
+        // Fallback para ZIP se share não suportar múltiplos arquivos
+        await handleDownloadAll();
+        return;
+      }
+    } catch (e) {
+      console.warn('Share all failed:', e);
+    }
+
+    setDownloading(false);
+    setDownloadProgress(null);
+  }, [images, handleShare, handleDownloadAll]);
 
   const handleGoBack = useCallback(() => {
     images.forEach(img => {
@@ -208,6 +308,8 @@ const Index: React.FC = () => {
     processed: !!i.processedSrc,
     type: i.type,
   })), [images]);
+
+  const isBusy = processing || downloading;
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col relative overflow-hidden app-entrance safe-area-pad">
@@ -335,7 +437,7 @@ const Index: React.FC = () => {
               <Button
                 onClick={handleMagic}
                 className="h-12 rounded-2xl bg-primary text-primary-foreground font-medium gap-2 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-primary/20 touch-manipulation"
-                disabled={processing}
+                disabled={isBusy}
               >
                 <Wand2 size={18} /> Magia
               </Button>
@@ -343,7 +445,7 @@ const Index: React.FC = () => {
                 onClick={handleReset}
                 variant="outline"
                 className="h-12 rounded-2xl font-medium gap-2 border-border text-foreground hover:bg-secondary active:scale-[0.97] transition-all duration-200 touch-manipulation"
-                disabled={processing}
+                disabled={isBusy}
               >
                 <RotateCcw size={18} /> Resetar
               </Button>
@@ -371,17 +473,22 @@ const Index: React.FC = () => {
               </div>
             </div>
 
-            {/* Progress */}
-            {batchProgress !== null && (
+            {/* Progress (processamento ou download ZIP) */}
+            {(batchProgress !== null || downloadProgress !== null) && (
               <div className="surface-card p-3 animate-fade-in">
                 <div className="flex items-center gap-3">
                   <Loader2 size={16} className="text-primary animate-spin flex-shrink-0" />
                   <div className="flex-1">
                     <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${batchProgress}%` }} />
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-300"
+                        style={{ width: `${batchProgress ?? downloadProgress ?? 0}%` }}
+                      />
                     </div>
                   </div>
-                  <span className="text-xs text-muted-foreground tabular-nums">{batchProgress}%</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {downloading ? 'Empacotando…' : ''} {batchProgress ?? downloadProgress ?? 0}%
+                  </span>
                 </div>
               </div>
             )}
@@ -391,7 +498,7 @@ const Index: React.FC = () => {
               <Button
                 onClick={handleProcessCurrent}
                 className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.97] transition-all duration-200 touch-manipulation"
-                disabled={processing || !selected}
+                disabled={isBusy || !selected}
               >
                 {processing && batchProgress === null ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
                 Aplicar
@@ -399,7 +506,7 @@ const Index: React.FC = () => {
               <Button
                 onClick={handleBatchProcess}
                 className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.97] transition-all duration-200 touch-manipulation"
-                disabled={processing || images.length === 0}
+                disabled={isBusy || images.length === 0}
               >
                 <Layers size={18} /> Todas ({images.length})
               </Button>
@@ -412,24 +519,46 @@ const Index: React.FC = () => {
                   <Button
                     onClick={handleDownloadCurrent}
                     className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.97] transition-all duration-200 touch-manipulation"
-                    disabled={!selected?.processedSrc}
+                    disabled={isBusy || !selected?.processedSrc}
                   >
                     <FileDown size={18} /> Baixar Atual
                   </Button>
                   <Button
                     onClick={handleDownloadAll}
                     className="h-12 rounded-2xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.97] transition-all duration-200 touch-manipulation"
+                    disabled={isBusy}
                   >
-                    <Download size={18} /> Todas ({processedCount})
+                    {downloading
+                      ? <Loader2 size={18} className="animate-spin" />
+                      : <PackageOpen size={18} />
+                    }
+                    {processedCount > 1 ? `ZIP (${processedCount})` : 'Baixar'}
                   </Button>
                 </div>
-                {canShare && selected?.processedSrc && (
-                  <Button
-                    onClick={() => selected && handleShare(selected)}
-                    className="w-full h-12 rounded-2xl bg-accent/15 text-accent font-medium gap-2 hover:bg-accent/25 active:scale-[0.97] transition-all duration-200 border border-accent/20 touch-manipulation"
-                  >
-                    <Share2 size={18} /> Compartilhar
-                  </Button>
+
+                {/* Compartilhar: única ou todas */}
+                {canShare && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {selected?.processedSrc && (
+                      <Button
+                        onClick={() => selected && handleShare(selected)}
+                        disabled={isBusy}
+                        className="h-12 rounded-2xl bg-accent/15 text-accent font-medium gap-2 hover:bg-accent/25 active:scale-[0.97] transition-all duration-200 border border-accent/20 touch-manipulation"
+                      >
+                        <Share2 size={18} /> Compartilhar
+                      </Button>
+                    )}
+                    {processedCount > 1 && (
+                      <Button
+                        onClick={handleShareAll}
+                        disabled={isBusy}
+                        className="h-12 rounded-2xl bg-accent/15 text-accent font-medium gap-2 hover:bg-accent/25 active:scale-[0.97] transition-all duration-200 border border-accent/20 touch-manipulation col-span-1"
+                        style={!selected?.processedSrc ? { gridColumn: '1 / -1' } : undefined}
+                      >
+                        <Share2 size={18} /> Compartilhar Todas ({processedCount})
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
