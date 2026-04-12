@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
-  Wand2, Download, RotateCcw, ChevronDown,
-  ImageIcon, Loader2, Check, Sparkles, Plus, FileDown, ArrowLeft,
+  Wand2, RotateCcw, ChevronDown,
+  ImageIcon, Layers, Loader2, Check, Sparkles, Plus, FileDown, ArrowLeft,
   PackageOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -112,7 +112,7 @@ const Index: React.FC = () => {
     setEnhance(REAL_ESTATE_MAGIC);
     setProcessing(true);
     setBatchProgress(0);
-    const snapshot = [...images]; // captura lista antes de processar
+    const snapshot = [...images];
     for (let i = 0; i < snapshot.length; i++) {
       const img = snapshot[i];
       try {
@@ -125,6 +125,24 @@ const Index: React.FC = () => {
     setProcessing(false);
     setBatchProgress(null);
   }, [images, watermark, processItem]);
+
+  // Aplicar ajustes manuais em TODOS os arquivos (sem mudar o preset)
+  const handleBatchApply = useCallback(async () => {
+    setProcessing(true);
+    setBatchProgress(0);
+    const snapshot = [...images];
+    for (let i = 0; i < snapshot.length; i++) {
+      const img = snapshot[i];
+      try {
+        const result = await processItem(img, enhance, watermark);
+        setImages(prev => prev.map(item => item.id === img.id ? { ...item, processedSrc: result } : item));
+      } catch (e) { console.error(`Falha em ${img.name}:`, e); }
+      setBatchProgress(Math.round(((i + 1) / snapshot.length) * 100));
+      await new Promise(r => setTimeout(r, 0));
+    }
+    setProcessing(false);
+    setBatchProgress(null);
+  }, [images, enhance, watermark, processItem]);
 
   const handleReset = useCallback(() => {
     setEnhance(DEFAULT_ENHANCE);
@@ -237,9 +255,19 @@ const Index: React.FC = () => {
       } else {
         // Fallback: ZIP se a API não suportar múltiplos arquivos
         await handleDownloadAll();
+        return; // handleDownloadAll já gerencia downloading state
+      }
+    } catch (e) {
+      console.warn('Share all failed, falling back to ZIP:', e);
+      // Fallback para ZIP se o share lançar erro (ex: usuário cancelou não conta)
+      const isCancelError = e instanceof Error && e.name === 'AbortError';
+      if (!isCancelError) {
+        setDownloading(false);
+        setDownloadProgress(null);
+        await handleDownloadAll();
         return;
       }
-    } catch (e) { console.warn('Share all failed:', e); }
+    }
     setDownloading(false);
     setDownloadProgress(null);
   }, [images, buildShareFiles, handleShareCurrent, handleDownloadAll]);
@@ -442,6 +470,18 @@ const Index: React.FC = () => {
                         <RotateCcw size={16} /> Resetar
                       </Button>
                     </div>
+                    {/* Aplicar ajustes em lote — usa configurações manuais do slider */}
+                    <Button
+                      onClick={handleBatchApply}
+                      disabled={isBusy || images.length === 0}
+                      className="w-full h-11 rounded-xl bg-secondary text-secondary-foreground font-medium gap-2 hover:bg-surface-hover active:scale-[0.97] transition-all duration-200 touch-manipulation"
+                    >
+                      {processing && batchProgress !== null
+                        ? <Loader2 size={16} className="animate-spin" />
+                        : <Layers size={16} />
+                      }
+                      Aplicar em Todas ({images.length})
+                    </Button>
                   </div>
                 </div>
               </div>
