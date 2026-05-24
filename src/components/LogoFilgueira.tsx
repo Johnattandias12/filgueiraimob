@@ -6,13 +6,13 @@ interface LogoFilgueiraProps {
 }
 
 const sizes = {
-  sm: { main: '19px', sub: '7px', gap: '1px', track: '2.4px' },
-  md: { main: '28px', sub: '10px', gap: '2px', track: '3.4px' },
-  lg: { main: '42px', sub: '14px', gap: '3px', track: '5px' },
+  sm: { main: '20px', sub: '7.5px', gap: '2px', track: '3.2px' },
+  md: { main: '30px', sub: '10px', gap: '3px', track: '4.5px' },
+  lg: { main: '44px', sub: '13px', gap: '4px', track: '6px' },
 };
 
-// Paleta oficial dos contratos Filgueira (dourado/sépia)
-const GOLD_GRADIENT = 'linear-gradient(180deg, #E4D3A6 0%, #B8A97A 52%, #8B7355 100%)';
+// Paleta oficial dos contratos Filgueira (dourado/sépia), tratada em gradiente sutil
+const GOLD_GRADIENT = 'linear-gradient(180deg, #EAD9AC 0%, #C5A45E 55%, #9C7E4E 100%)';
 
 const LogoFilgueira: React.FC<LogoFilgueiraProps> = ({ className, size = 'md' }) => {
   const s = sizes[size];
@@ -21,11 +21,11 @@ const LogoFilgueira: React.FC<LogoFilgueiraProps> = ({ className, size = 'md' })
       <span
         className="leading-none"
         style={{
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Roboto", "Helvetica Neue", sans-serif',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           fontSize: s.main,
-          fontWeight: 900,
-          letterSpacing: '-1.5px',
-          lineHeight: 0.9,
+          fontWeight: 600,
+          letterSpacing: '-0.045em',
+          lineHeight: 1,
           backgroundImage: GOLD_GRADIENT,
           WebkitBackgroundClip: 'text',
           backgroundClip: 'text',
@@ -37,13 +37,13 @@ const LogoFilgueira: React.FC<LogoFilgueiraProps> = ({ className, size = 'md' })
       </span>
       <span
         style={{
-          fontFamily: 'Georgia, "Times New Roman", serif',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           fontSize: s.sub,
-          fontWeight: 600,
+          fontWeight: 500,
           letterSpacing: s.track,
           marginTop: s.gap,
           textTransform: 'uppercase',
-          color: '#A89F8C',
+          color: '#9C8C6E',
         }}
       >
         Imobiliária
