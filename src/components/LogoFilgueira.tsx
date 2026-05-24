@@ -5,27 +5,29 @@ interface LogoFilgueiraProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+// Proporção espelha a marca d'água: "Imobiliária" ≈ 1/3 de "Filgueira"
 const sizes = {
-  sm: { main: '20px', sub: '7.5px', gap: '2px', track: '3.2px' },
-  md: { main: '30px', sub: '10px', gap: '3px', track: '4.5px' },
-  lg: { main: '44px', sub: '13px', gap: '4px', track: '6px' },
+  sm: { main: '22px', sub: '8px', gap: '1px' },
+  md: { main: '32px', sub: '11px', gap: '2px' },
+  lg: { main: '46px', sub: '15px', gap: '2px' },
 };
 
-// Paleta oficial dos contratos Filgueira (dourado/sépia), tratada em gradiente sutil
+// Paleta oficial dos contratos Filgueira (dourado/sépia)
 const GOLD_GRADIENT = 'linear-gradient(180deg, #EAD9AC 0%, #C5A45E 55%, #9C7E4E 100%)';
 
 const LogoFilgueira: React.FC<LogoFilgueiraProps> = ({ className, size = 'md' }) => {
   const s = sizes[size];
   return (
     <div className={`flex flex-col items-center justify-center select-none ${className || ''}`}>
+      {/* "Filgueira" — mesma fonte sans bold da marca d'água, em dourado */}
       <span
         className="leading-none"
         style={{
-          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Roboto", "Helvetica Neue", sans-serif',
           fontSize: s.main,
-          fontWeight: 600,
-          letterSpacing: '-0.045em',
-          lineHeight: 1,
+          fontWeight: 900,
+          letterSpacing: '-0.5px',
+          lineHeight: 0.95,
           backgroundImage: GOLD_GRADIENT,
           WebkitBackgroundClip: 'text',
           backgroundClip: 'text',
@@ -35,15 +37,15 @@ const LogoFilgueira: React.FC<LogoFilgueiraProps> = ({ className, size = 'md' })
       >
         Filgueira
       </span>
+      {/* "Imobiliária" — mesma serif da marca d'água, em dourado */}
       <span
         style={{
-          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontFamily: 'Georgia, "Times New Roman", serif',
           fontSize: s.sub,
-          fontWeight: 500,
-          letterSpacing: s.track,
+          fontWeight: 700,
+          letterSpacing: '0.5px',
           marginTop: s.gap,
-          textTransform: 'uppercase',
-          color: '#9C8C6E',
+          color: '#C5A45E',
         }}
       >
         Imobiliária

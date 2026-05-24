@@ -1,5 +1,6 @@
 import React from 'react';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { WatermarkSettings } from '@/lib/imageEngine';
 import {
   ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight,
@@ -27,18 +28,11 @@ const WatermarkControls: React.FC<WatermarkControlsProps> = ({ settings, onChang
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-foreground">Marca d'água</h3>
-        <button
-          onClick={() => update({ enabled: !settings.enabled })}
-          className={`
-            w-11 h-6 rounded-full relative transition-colors duration-200
-            ${settings.enabled ? 'bg-primary' : 'bg-muted'}
-          `}
-        >
-          <span className={`
-            absolute top-0.5 w-5 h-5 rounded-full bg-foreground transition-transform duration-200
-            ${settings.enabled ? 'translate-x-[22px]' : 'translate-x-0.5'}
-          `} />
-        </button>
+        <Switch
+          checked={settings.enabled}
+          onCheckedChange={(checked) => update({ enabled: checked })}
+          aria-label="Ativar marca d'água"
+        />
       </div>
 
       {settings.enabled && (
