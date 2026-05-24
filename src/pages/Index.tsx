@@ -240,7 +240,8 @@ const Index: React.FC = () => {
       const blob = await response.blob();
       const file = new File([blob], `filgueira_${baseName}.${ext}`, { type: mimeType });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Filgueira Imobiliária' });
+        // Sem title/text: evita que o WhatsApp anexe uma legenda na mídia
+        await navigator.share({ files: [file] });
       }
     } catch (e) {
       console.warn('Share failed:', e);
@@ -275,7 +276,8 @@ const Index: React.FC = () => {
       }
 
       if (navigator.share && navigator.canShare?.({ files })) {
-        await navigator.share({ files, title: 'Filgueira Imobiliária' });
+        // Sem title/text: evita que o WhatsApp anexe uma legenda na mídia
+        await navigator.share({ files });
       } else {
         // Fallback para ZIP se share não suportar múltiplos arquivos
         await handleDownloadAll();
@@ -567,7 +569,11 @@ const Index: React.FC = () => {
       </main>
 
       <footer className="py-3 text-center flex-shrink-0 relative z-10 pb-safe">
-        <p className="text-[11px] text-muted-foreground/60">Filgueira Imobiliária © {new Date().getFullYear()}</p>
+        <p className="text-[11px] text-muted-foreground/60">
+          Desenvolvido pela{' '}
+          <span className="font-semibold" style={{ color: '#B8A97A' }}>Meu IA</span>
+          {' '}para Filgueira Imobiliária · © {new Date().getFullYear()}
+        </p>
       </footer>
     </div>
   );
