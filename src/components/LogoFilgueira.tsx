@@ -7,9 +7,9 @@ interface LogoFilgueiraProps {
 
 // Proporção espelha a marca d'água: "Imobiliária" ≈ 1/3 de "Filgueira"
 const sizes = {
-  sm: { main: '22px', sub: '8px', gap: '1px' },
-  md: { main: '32px', sub: '11px', gap: '2px' },
-  lg: { main: '46px', sub: '15px', gap: '2px' },
+  sm: { main: '22px', sub: '8px', gap: '-2px' },
+  md: { main: '32px', sub: '11px', gap: '-3px' },
+  lg: { main: '46px', sub: '15px', gap: '-4px' },
 };
 
 // Paleta oficial dos contratos Filgueira (dourado/sépia)
@@ -21,13 +21,14 @@ const LogoFilgueira: React.FC<LogoFilgueiraProps> = ({ className, size = 'md' })
     <div className={`flex flex-col items-center justify-center select-none ${className || ''}`}>
       {/* "Filgueira" — mesma fonte sans bold da marca d'água, em dourado */}
       <span
-        className="leading-none"
         style={{
+          display: 'inline-block',
           fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Roboto", "Helvetica Neue", sans-serif',
           fontSize: s.main,
           fontWeight: 900,
           letterSpacing: '-0.5px',
-          lineHeight: 0.95,
+          lineHeight: 1.15,
+          paddingBottom: '0.04em',
           backgroundImage: GOLD_GRADIENT,
           WebkitBackgroundClip: 'text',
           backgroundClip: 'text',

@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
-  Wand2, Download, Share2, RotateCcw, ChevronDown,
+  Wand2, Download, RotateCcw, ChevronDown,
   Layers, ImageIcon, Loader2, Check, Sparkles, Plus, FileDown, ArrowLeft,
-  PackageOpen,
+  PackageOpen, Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UploadZone from '@/components/UploadZone';
@@ -517,6 +517,26 @@ const Index: React.FC = () => {
             {/* Download / Share */}
             {processedCount > 0 && (
               <div className="space-y-2 animate-fade-in">
+                {/* Botão principal: enviar pro WhatsApp (abre o WhatsApp na lista de apps) */}
+                {canShare && (
+                  <Button
+                    onClick={handleShareAll}
+                    disabled={isBusy}
+                    className="w-full h-14 rounded-2xl text-white font-semibold gap-2.5 text-[15px] active:scale-[0.97] transition-all duration-200 touch-manipulation"
+                    style={{
+                      backgroundColor: '#25D366',
+                      boxShadow: '0 8px 24px rgba(37, 211, 102, 0.28)',
+                    }}
+                  >
+                    {downloading
+                      ? <Loader2 size={20} className="animate-spin" />
+                      : <Send size={20} />
+                    }
+                    Enviar pro WhatsApp{processedCount > 1 ? ` (${processedCount})` : ''}
+                  </Button>
+                )}
+
+                {/* Downloads secundários */}
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     onClick={handleDownloadCurrent}
@@ -537,31 +557,6 @@ const Index: React.FC = () => {
                     {processedCount > 1 ? `ZIP (${processedCount})` : 'Baixar'}
                   </Button>
                 </div>
-
-                {/* Compartilhar: única ou todas */}
-                {canShare && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {selected?.processedSrc && (
-                      <Button
-                        onClick={() => selected && handleShare(selected)}
-                        disabled={isBusy}
-                        className="h-12 rounded-2xl bg-accent/15 text-accent font-medium gap-2 hover:bg-accent/25 active:scale-[0.97] transition-all duration-200 border border-accent/20 touch-manipulation"
-                      >
-                        <Share2 size={18} /> Compartilhar
-                      </Button>
-                    )}
-                    {processedCount > 1 && (
-                      <Button
-                        onClick={handleShareAll}
-                        disabled={isBusy}
-                        className="h-12 rounded-2xl bg-accent/15 text-accent font-medium gap-2 hover:bg-accent/25 active:scale-[0.97] transition-all duration-200 border border-accent/20 touch-manipulation col-span-1"
-                        style={!selected?.processedSrc ? { gridColumn: '1 / -1' } : undefined}
-                      >
-                        <Share2 size={18} /> Compartilhar Todas ({processedCount})
-                      </Button>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
