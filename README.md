@@ -1,37 +1,23 @@
-# Filgueira Imobiliária — Editor de Mídia
+# Filgueira Imob
 
-PWA para aprimoramento de fotos e vídeos imobiliários com marca d'água.  
-Processamento 100% no navegador, sem upload para servidor.
+Real estate platform for a brokerage. Visitors browse property listings, filter and search, open detailed pages and send leads straight to the team.
 
-## Funcionalidades
+Live: https://filgueiraimob.vercel.app
 
-- Upload de até 40 fotos/vídeos por sessão
-- Ajustes de exposição, contraste, saturação e calor
-- Botão "Magia" com preset imobiliário otimizado
-- Marca d'água "Filgueira Imobiliária" configurável (posição, tamanho, opacidade)
-- Processamento em lote de todas as mídias
-- **Exportação em lote via ZIP** — um único arquivo com todas as mídias processadas
-- **Compartilhamento nativo** (WhatsApp, galeria) via Web Share API — individual ou em lote
-- Slider antes/depois para comparação de imagens
-- Instalável como PWA (funciona offline)
+## Features
 
-## Tecnologias
+- Property catalog with search and filtering
+- Detailed listing pages with photo galleries
+- Lead capture wired to the brokerage
+- Mobile first, responsive UI
 
-- React 18 + TypeScript + Vite
-- Canvas API (imagens) / FFmpeg.wasm (vídeos)
-- JSZip (exportação em lote)
-- shadcn-ui + Tailwind CSS
-- Deploy: Vercel | BaaS: Supabase
+## Stack
 
-## Desenvolvimento local
+React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui (Radix), React Router.
+
+## Running locally
 
 ```bash
 npm install
-npm run dev        # http://localhost:8080
-npm run build      # build de produção
-npm run preview    # preview do build
+npm run dev
 ```
-
-## Deploy
-
-Ver [CLAUDE.md](./CLAUDE.md) para instruções detalhadas de deploy no Vercel e integração com Supabase.
